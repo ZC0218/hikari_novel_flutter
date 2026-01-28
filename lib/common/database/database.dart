@@ -14,7 +14,9 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-    onUpgrade: (m, from, to) async {},
+    onUpgrade: (m, from, to) async {
+      //TODO 1->2
+    },
   );
 
   Future<void> insertAllBookshelf(Iterable<BookshelfEntityData> data) => batch((b) => b.insertAll(bookshelfEntity, data));
