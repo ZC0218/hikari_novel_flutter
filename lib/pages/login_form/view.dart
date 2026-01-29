@@ -16,6 +16,15 @@ class _LoginFormPageState extends State<LoginFormPage> {
   final _usernameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
 
+  /// Login cookie validity (seconds) that Wenku8 expects via `usecookie`.
+  ///
+  /// Matches the original Android app mapping:
+  /// - Only once: 0
+  /// - 1 day: 86400
+  /// - 1 month: 2592000
+  /// - 1 year: 315360000 (kept as-is for compatibility with the original app)
+  String _usecookieSeconds = "86400";
+
   @override
   void dispose() {
     _usernameCtrl.dispose();
@@ -75,6 +84,24 @@ class _LoginFormPageState extends State<LoginFormPage> {
                         ),
                         onSubmitted: (_) => _onLogin(),
                       ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: _usecookieSeconds,
+                        decoration: InputDecoration(
+                          labelText: 'login_validity'.tr,
+                          border: const OutlineInputBorder(),
+                        ),
+                        items: [
+                          DropdownMenuItem(value: "0", child: Text('only_once'.tr)),
+                          DropdownMenuItem(value: "86400", child: Text('one_day'.tr)),
+                          DropdownMenuItem(value: "2592000", child: Text('one_month'.tr)),
+                          DropdownMenuItem(value: "315360000", child: Text('one_year'.tr)),
+                        ],
+                        onChanged: (v) {
+                          if (v == null) return;
+                          setState(() => _usecookieSeconds = v);
+                        },
+                      ),
                       const SizedBox(height: 16),
                       Obx(
                         () => FilledButton.icon(
@@ -132,6 +159,10 @@ class _LoginFormPageState extends State<LoginFormPage> {
       );
       return;
     }
-    controller.login(username: username, password: password);
+    controller.login(
+      username: username,
+      password: password,
+      usecookieSeconds: _usecookieSeconds,
+    );
   }
 }
