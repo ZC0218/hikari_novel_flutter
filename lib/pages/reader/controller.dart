@@ -93,6 +93,8 @@ class ReaderController extends GetxController {
 
   Rxn<String> currentBgImagePath = Rxn();
 
+  bool isInitialized = false;
+
   @override
   void onInit() async {
     super.onInit();
@@ -114,8 +116,8 @@ class ReaderController extends GetxController {
     //延迟更新阅读记录
     //debounce / ever / interval 只能在 Controller 生命周期里创建一次
     //TODO 还需要优化
-    debounce(location, (_) async => setReadHistory(), time: const Duration(milliseconds: 100));
-    debounce(currentIndex, (_) async => setReadHistory(), time: const Duration(milliseconds: 100));
+    interval(location, (_) async => setReadHistory(), time: const Duration(milliseconds: 100));
+    interval(currentIndex, (_) async => setReadHistory(), time: const Duration(milliseconds: 100));
   }
 
   @override
@@ -150,6 +152,7 @@ class ReaderController extends GetxController {
 
   //获取初始页面位置
   int getInitLocation() {
+    isInitialized = true;
     if (readerSettingsState.value.direction == ReaderDirection.upToDown) {
       try {
         int value = int.parse(Get.parameters["location"]!);

@@ -47,6 +47,12 @@ class _VerticalReadPageState extends State<VerticalReadPage> with WidgetsBinding
     position = widget.initPosition.toDouble();
     _lastLayoutSig = _layoutSignature();
     WidgetsBinding.instance.addObserver(this);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.controller.jumpTo(widget.initPosition.toDouble());
+      widget.onScroll(widget.controller.offset, widget.controller.position.maxScrollExtent); //页面加载完成时，提醒保存进度
+    });
+
     resetPage();
   }
 
@@ -66,11 +72,6 @@ class _VerticalReadPageState extends State<VerticalReadPage> with WidgetsBinding
       setState(() {});
       return;
     }
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      widget.controller.jumpTo(widget.initPosition.toDouble());
-      widget.onScroll(widget.controller.offset, widget.controller.position.maxScrollExtent); //页面加载完成时，提醒保存进度
-    });
   }
 
   @override

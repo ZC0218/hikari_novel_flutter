@@ -179,50 +179,47 @@ class ReaderPage extends StatelessWidget {
   }
 
   Widget _buildVertical(BuildContext context) {
-    return Obx(
-      () => SizedBox(
-        width: double.infinity,
-        height: double.infinity,
-        child: EasyRefresh(
-          header: MaterialHeader2(
-            triggerOffset: 80,
-            child: Container(
-              decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer, borderRadius: BorderRadius.circular(24)),
-              padding: const EdgeInsets.all(12),
-              child: Icon(Icons.arrow_circle_up, color: Theme.of(context).colorScheme.primary),
-            ),
+    return SizedBox(
+      height: double.infinity,
+      child: EasyRefresh(
+        header: MaterialHeader2(
+          triggerOffset: 80,
+          child: Container(
+            decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer, borderRadius: BorderRadius.circular(24)),
+            padding: const EdgeInsets.all(12),
+            child: Icon(Icons.arrow_circle_up, color: Theme.of(context).colorScheme.primary),
           ),
-          footer: MaterialFooter2(
-            triggerOffset: 80,
-            child: Container(
-              decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer, borderRadius: BorderRadius.circular(24)),
-              padding: const EdgeInsets.all(12),
-              child: Icon(Icons.arrow_circle_down, color: Theme.of(context).colorScheme.primary),
-            ),
+        ),
+        footer: MaterialFooter2(
+          triggerOffset: 80,
+          child: Container(
+            decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer, borderRadius: BorderRadius.circular(24)),
+            padding: const EdgeInsets.all(12),
+            child: Icon(Icons.arrow_circle_down, color: Theme.of(context).colorScheme.primary),
           ),
-          refreshOnStart: false,
-          onRefresh: controller.prevChapter,
-          onLoad: controller.nextChapter,
-          child: VerticalReadPage(
-            controller.text.value,
-            controller.images,
-            initPosition: controller.getInitLocation(),
-            padding: padding,
-            style: textStyle,
-            controller: controller.scrollController,
-            onScroll: (position, max) {
-              if (max == 0 && position == 0) {
-                //仅一页的情况下
-                controller.location.value = 0;
-                controller.verticalProgress.value = 100;
-                controller.setReadHistory(); //立即更新历史阅读记录
-              } else if (max > 0) {
-                controller.location.value = position.toInt();
-                controller.verticalProgress.value = ((position.toInt() / max.toInt()) * 100).toInt();
-                //由controller的debounce监听location变化，判断是否更新历史阅读记录
-              }
-            },
-          ),
+        ),
+        refreshOnStart: false,
+        onRefresh: controller.prevChapter,
+        onLoad: controller.nextChapter,
+        child: VerticalReadPage(
+          controller.text.value,
+          controller.images,
+          initPosition: controller.isInitialized ? 0 : controller.getInitLocation(),
+          padding: padding,
+          style: textStyle,
+          controller: controller.scrollController,
+          onScroll: (position, max) {
+            if (max == 0 && position == 0) {
+              //仅一页的情况下
+              controller.location.value = 0;
+              controller.verticalProgress.value = 100;
+              controller.setReadHistory(); //立即更新历史阅读记录
+            } else if (max > 0) {
+              controller.location.value = position.toInt();
+              controller.verticalProgress.value = ((position.toInt() / max.toInt()) * 100).toInt();
+              //由controller的debounce监听location变化，判断是否更新历史阅读记录
+            }
+          },
         ),
       ),
     );
@@ -252,7 +249,7 @@ class ReaderPage extends StatelessWidget {
       child: HorizontalReadPage(
         controller.text.value,
         controller.images,
-        initIndex: controller.getInitLocation(),
+        initIndex: controller.isInitialized ? 0 : controller.getInitLocation(),
         padding: padding,
         style: textStyle,
         reverse: controller.readerSettingsState.value.direction == ReaderDirection.rightToLeft,
