@@ -5,7 +5,7 @@ import 'package:hikari_novel_flutter/pages/bookshelf/widgets/bookshelf_content_v
 import 'package:hikari_novel_flutter/pages/bookshelf/widgets/bookshelf_search_view.dart';
 
 import '../../common/extension.dart';
-import '../../common/widgets.dart';
+import '../../common/common_widgets.dart';
 import '../../models/page_state.dart';
 import '../../widgets/state_page.dart';
 
@@ -97,7 +97,7 @@ class BookshelfPage extends StatelessWidget {
   }
 
   Widget? _buildBottomBar(BuildContext context) {
-    if (controller.isSelectionMode.value && context.isLargeScreen()) return Widgets.bookshelfBottomActionBar(currentTabController, controller);
+    if (controller.isSelectionMode.value && context.isLargeScreen()) return CommonWidgets.bookshelfBottomActionBar(currentTabController, controller);
     return null;
   }
 }

@@ -286,6 +286,8 @@ class AppTranslations extends Translations {
       "stop": "停止",
       "exit": "退出",
       "chapter_content_loading_tip": "当前章节还在加载中",
+      "copy_all": "复制全部",
+      "free_copy": "自由复制",
     },
 
     "zh_TW": {
@@ -570,7 +572,9 @@ class AppTranslations extends Translations {
       "play": "播放",
       "stop": "停止",
       "exit": "離開",
-      "chapter_content_loading_tip": "目前章節仍在載入中"
+      "chapter_content_loading_tip": "目前章節仍在載入中",
+      "copy_all": "複製全部",
+      "free_copy": "自由複製"
     }
   };
 }

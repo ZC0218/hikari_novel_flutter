@@ -52,16 +52,8 @@ class NovelDetailController extends GetxController with GetSingleTickerProviderS
   @override
   void onInit() {
     super.onInit();
-    _fabAnimationCtr = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 100),
-    )..forward();
-    animation = _fabAnimationCtr.drive(
-      Tween<Offset>(
-        begin: const Offset(0.0, 2.0),
-        end: Offset.zero,
-      ).chain(CurveTween(curve: Curves.easeInOut)),
-    );
+    _fabAnimationCtr = AnimationController(vsync: this, duration: const Duration(milliseconds: 100))..forward();
+    animation = _fabAnimationCtr.drive(Tween<Offset>(begin: const Offset(0.0, 2.0), end: Offset.zero).chain(CurveTween(curve: Curves.easeInOut)));
   }
 
   @override
