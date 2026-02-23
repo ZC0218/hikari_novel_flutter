@@ -33,6 +33,8 @@ class _NovelDetailPageState extends State<NovelDetailPage> {
   final RxDouble _opacity = 0.0.obs;
   final ScrollController _scrollController = ScrollController();
 
+  bool _isFabVisible = false;
+
   @override
   void initState() {
     super.initState();
@@ -76,6 +78,8 @@ class _NovelDetailPageState extends State<NovelDetailPage> {
                 body: NotificationListener<Notification>(
                   onNotification: (Notification notification) {
                     if (notification is UserScrollNotification) {
+                      if (!_isFabVisible) return false;
+
                       final direction = notification.direction;
                       if (direction == ScrollDirection.forward) {
                         controller.showFab();
@@ -459,8 +463,10 @@ class _NovelDetailPageState extends State<NovelDetailPage> {
           stream: DBService.instance.getLastestReadHistoryByAid(controller.aid),
           builder: (_, snapshot) {
             if (snapshot.data == null && !controller.isValidReadHistory(snapshot.data)) {
+              _isFabVisible = false;
               return Container();
             }
+            _isFabVisible = true;
             final history = snapshot.data;
             return SlideTransition(
               position: controller.animation,
