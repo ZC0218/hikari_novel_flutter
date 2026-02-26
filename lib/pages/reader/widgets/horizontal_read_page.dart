@@ -323,10 +323,6 @@ class _HorizontalReadPageState extends State<HorizontalReadPage> with WidgetsBin
     setState(() {}); //刷新UI
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (widget.initIndex > _pageCount()) {
-        showErrorDialog("record_position_exceeds_max_range_tip".tr, [TextButton(onPressed: Get.back, child: Text("confirm".tr))]);
-        return;
-      }
       widget.controller.jumpToPage(widget.initIndex);
     });
   }
