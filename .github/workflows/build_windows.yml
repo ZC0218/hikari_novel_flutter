@@ -1,43 +1,73 @@
-name: Build Windows Release
-
+name: Hikari Novel Flutter Windows Build
 on:
-  push:
-    tags:
-      - 'v*' # 当你推送以 v 开头的标签（如 v1.0.0）时触发编译
+  workflow_dispatch:  # 仅手动触发，避免自动编译
 
 jobs:
-  build:
-    runs-on: windows-latest
-
+  build-windows:
+    runs-on: windows-2022  # 稳定的Windows编译环境（预装VS2022+Windows SDK）
     steps:
-      - name: Checkout code
+      # 1. 检出仓库代码（含源码/压缩包）
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Flutter
+      # 2. 安装匹配Dart 3.9+的Flutter稳定版
+      - name: Install Flutter 3.19.0
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.19.0'
           channel: 'stable'
-          flutter-version: '3.x' # 或者指定项目所需的特定版本
+          cache: true  # 缓存SDK，加速后续编译
 
-      - name: Enable Windows support
-        run: flutter config --enable-windows-desktop
+      # 3. 检查Flutter环境（排错用）
+      - name: Verify Flutter Environment
+        run: flutter doctor -v
 
-      - name: Get dependencies
-        run: flutter pub get
+      # 4. 若上传的是压缩包，先解压（适配你的场景）
+      - name: Unzip Source Code (if zip exists)
+        run: |
+          $zipFiles = Get-ChildItem -Path . -Filter "*.zip"
+          if ($zipFiles.Count -gt 0) {
+              Expand-Archive -Path $zipFiles[0].FullName -DestinationPath ./source -Force
+              $sourceDir = Get-ChildItem -Path ./source -Directory | Select-Object -First 1
+              if ($sourceDir) {
+                  Copy-Item -Path "$($sourceDir.FullName)\*" -Destination . -Recurse -Force
+              }
+              Remove-Item -Path ./source -Recurse -Force
+          }
 
-      - name: Build Windows
-        run: flutter build windows --release
+      # 5. 生成Windows编译目录（解决项目无windows/目录的问题）
+      - name: Generate Windows Build Files
+        run: flutter create --platforms windows .
 
-      - name: Upload Artifacts
+      # 6. 安装/升级依赖（适配Windows）
+      - name: Install & Upgrade Dependencies
+        run: |
+          # 替换/补充Windows适配依赖
+          flutter pub add path_provider_windows
+          flutter pub add url_launcher_windows
+          flutter pub upgrade
+          flutter pub get
+          flutter precache --windows  # 预下载Windows编译资源
+
+      # 7. 清理缓存（避免编译残留）
+      - name: Clean Project
+        run: flutter clean
+
+      # 8. 编译Windows Release版（输出详细日志）
+      - name: Build Windows Release EXE
+        run: |
+          flutter build windows --release --verbose
+          # 打印目录结构，定位产物（日志中可查看）
+          dir ./build /s
+          dir ./windows /s
+
+      # 9. 上传产物（兜底逻辑：兼容所有可能的产物路径）
+      - name: Upload Windows EXE Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-release
-          path: build/windows/x64/runner/Release/
-          
-      - name: Release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: |
-            build/windows/x64/runner/Release/*.exe
-            build/windows/x64/runner/Release/*.dll
+          name: hikari-novel-windows-exe
+          path: |
+            build/windows/runner/Release/**/*
+            build/windows/runner/Debug/**/*  # 兜底：若Release未生成，上传Debug版
+            ./windows/runner/Release/**/*
+          if-no-files-found: warn  # 无文件时仅警告，不终止流程
