@@ -1,28 +1,24 @@
 name: Hikari Novel Flutter Windows Build
 on:
-  workflow_dispatch:  # 仅手动触发，避免自动编译
+  workflow_dispatch:  # 仅手动触发
 
 jobs:
   build-windows:
-    runs-on: windows-2022  # 稳定的Windows编译环境（预装VS2022+Windows SDK）
+    runs-on: windows-2022
     steps:
-      # 1. 检出仓库代码（含源码/压缩包）
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. 安装匹配Dart 3.9+的Flutter稳定版
       - name: Install Flutter 3.19.0
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.38.5'
           channel: 'stable'
-          cache: true  # 缓存SDK，加速后续编译
+          cache: true
 
-      # 3. 检查Flutter环境（排错用）
       - name: Verify Flutter Environment
         run: flutter doctor -v
 
-      # 4. 若上传的是压缩包，先解压（适配你的场景）
       - name: Unzip Source Code (if zip exists)
         run: |
           $zipFiles = Get-ChildItem -Path . -Filter "*.zip"
@@ -35,39 +31,32 @@ jobs:
               Remove-Item -Path ./source -Recurse -Force
           }
 
-      # 5. 生成Windows编译目录（解决项目无windows/目录的问题）
       - name: Generate Windows Build Files
         run: flutter create --platforms windows .
 
-      # 6. 安装/升级依赖（适配Windows）
       - name: Install & Upgrade Dependencies
         run: |
-          # 替换/补充Windows适配依赖
           flutter pub add path_provider_windows
           flutter pub add url_launcher_windows
           flutter pub upgrade
           flutter pub get
-          flutter precache --windows  # 预下载Windows编译资源
+          flutter precache --windows
 
-      # 7. 清理缓存（避免编译残留）
       - name: Clean Project
         run: flutter clean
 
-      # 8. 编译Windows Release版（输出详细日志）
       - name: Build Windows Release EXE
         run: |
           flutter build windows --release --verbose
-          # 打印目录结构，定位产物（日志中可查看）
-          dir ./build /s
-          dir ./windows /s
+          # 修复：使用 PowerShell 正确的递归目录查看命令
+          Get-ChildItem -Path ./build -Recurse | Select-Object FullName
+          Get-ChildItem -Path ./windows -Recurse | Select-Object FullName
 
-      # 9. 上传产物（兜底逻辑：兼容所有可能的产物路径）
       - name: Upload Windows EXE Artifact
         uses: actions/upload-artifact@v4
         with:
           name: hikari-novel-windows-exe
+          # 修复：使用正确的产物路径（x64 目录）
           path: |
-            build/windows/runner/Release/**/*
-            build/windows/runner/Debug/**/*  # 兜底：若Release未生成，上传Debug版
-            ./windows/runner/Release/**/*
-          if-no-files-found: warn  # 无文件时仅警告，不终止流程
+            build/windows/x64/runner/Release/**/*
+          if-no-files-found: warn
