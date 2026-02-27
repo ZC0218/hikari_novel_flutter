@@ -13,7 +13,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.9.2'  # 关键：升级到匹配Dart 3.9.2的版本
+          flutter-version: '3.38.5'  # 关键：升级到匹配Dart 3.9.2的版本
           channel: 'stable'
 
       - name: Flutter Doctor（查看版本匹配情况）
