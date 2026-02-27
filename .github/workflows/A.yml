@@ -1,0 +1,65 @@
+name: Hikari Novel Flutter Build APK
+on:
+  workflow_dispatch:  # 手动触发编译
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest  # Android 编译用 Ubuntu 更稳定
+    steps:
+      # 1. 检出代码（兼容压缩包/直接源码）
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. 解压源码压缩包（若上传的是zip）
+      - name: Unzip Source Code (if zip exists)
+        run: |
+          if ls *.zip 1> /dev/null 2>&1; then
+            unzip *.zip -d ./source
+            cp -r ./source/*/* . || cp -r ./source/* .
+            rm -rf ./source
+          fi
+
+      # 3. 安装 Flutter 3.19.0（匹配项目Dart 3.9+版本）
+      - name: Install Flutter 3.19.0
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.5'
+          channel: 'stable'
+          cache: true  # 缓存SDK，加速编译
+
+      # 4. 安装 Android SDK（自动配置编译环境）
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # 5. 检查环境（排错用）
+      - name: Verify Flutter & Android Env
+        run: |
+          flutter doctor -v
+          flutter config --enable-android
+
+      # 6. 安装/升级项目依赖
+      - name: Install Dependencies
+        run: |
+          flutter pub upgrade
+          flutter pub get
+          flutter precache --android  # 预下载Android编译资源
+
+      # 7. 清理缓存
+      - name: Clean Project
+        run: flutter clean
+
+      # 8. 编译 Release 版 APK（关键步骤）
+      - name: Build Release APK
+        run: |
+          flutter build apk --release --verbose --split-per-abi
+          # 打印产物路径，确认APK生成位置
+          ls -l ./build/app/outputs/flutter-apk/
+
+      # 9. 上传APK产物（可直接下载）
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hikari-novel-apk
+          path: |
+            build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error  # 无APK时提示错误
