@@ -1,31 +1,46 @@
-name: Flutter iOS Build IPA
+name: Flutter iOS Build IPA (Fixed Version)
 on:
   workflow_dispatch: # 手动触发编译
 
 jobs:
   build-ios:
-    runs-on: macos-latest # 调用GitHub的Mac服务器
+    runs-on: macos-latest
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 安装Flutter 3.19.2（匹配Dart 3.10.7+）
+      - name: 强制安装Flutter 3.19.2（锁定Dart 3.10.7）
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.2' # 关键修改：该版本对应Dart 3.10.7，满足项目要求
+          flutter-version: '3.19.2'
           channel: 'stable'
+          # 强制清理缓存，避免旧版本干扰
+          cache: false
+
+      - name: 验证Flutter/Dart版本（关键：确保版本正确）
+        run: |
+          flutter --version
+          dart --version
+          # 检查Dart版本是否≥3.10.7，不满足则直接终止
+          DART_VERSION=$(dart --version | grep -oE '3\.[0-9]+\.[0-9]+')
+          REQUIRED_VERSION="3.10.7"
+          if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$DART_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]; then
+            echo "❌ Dart版本错误：当前$DART_VERSION，要求≥$REQUIRED_VERSION"
+            exit 1
+          fi
+          echo "✅ Dart版本验证通过：$DART_VERSION"
 
       - name: 安装项目依赖
         run: flutter pub get
 
-      - name: 安装iOS CocoaPods依赖（新增：解决Flutter iOS编译必选依赖）
+      - name: 安装iOS CocoaPods依赖
         run: |
           cd ios
           pod install --repo-update
           cd ..
 
       - name: 构建iOS无签名Release包
-        run: flutter build ios --release --no-codesign --no-simulator # 新增--no-simulator：确保编译真实设备版本
+        run: flutter build ios --release --no-codesign --no-simulator
 
       - name: 打包成无签名IPA
         run: |
