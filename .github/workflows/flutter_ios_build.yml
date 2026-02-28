@@ -9,17 +9,23 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 安装Flutter 3.38.5
+      - name: 安装Flutter 3.19.2（匹配Dart 3.10.7+）
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.38.5' # 与项目开发环境一致
+          flutter-version: '3.19.2' # 关键修改：该版本对应Dart 3.10.7，满足项目要求
           channel: 'stable'
 
       - name: 安装项目依赖
         run: flutter pub get
 
+      - name: 安装iOS CocoaPods依赖（新增：解决Flutter iOS编译必选依赖）
+        run: |
+          cd ios
+          pod install --repo-update
+          cd ..
+
       - name: 构建iOS无签名Release包
-        run: flutter build ios --release --no-codesign # 关键：--no-codesign 跳过签名
+        run: flutter build ios --release --no-codesign --no-simulator # 新增--no-simulator：确保编译真实设备版本
 
       - name: 打包成无签名IPA
         run: |
