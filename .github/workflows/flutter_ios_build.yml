@@ -1,4 +1,4 @@
-name: Flutter iOS Build IPA (Final Fix)
+name: Flutter iOS Build IPA (Final Working Version)
 on:
   workflow_dispatch: # 手动触发编译
 
@@ -9,36 +9,24 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 接受Flutter SDK协议（避免安装卡顿）
-        run: |
-          echo "export PATH=\"\$PATH:\$HOME/flutter/bin\"" >> $GITHUB_ENV
-          echo "y" | flutter doctor --android-licenses > /dev/null 2>&1
-
       - name: 手动下载并安装Flutter 3.22.0（Dart 3.10.9，满足≥3.10.7）
         run: |
           # 手动下载指定版本，绕过Actions自动替换
-          wget https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_arm64_3.22.0-stable.zip -O flutter.zip
+          curl -L https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_arm64_3.22.0-stable.zip -o flutter.zip
           unzip -q flutter.zip -d $HOME
-          # 验证手动安装的版本
-          $HOME/flutter/bin/flutter --version
-          $HOME/flutter/bin/dart --version
           # 将手动安装的Flutter加入环境变量（优先级最高）
           echo "$HOME/flutter/bin" >> $GITHUB_PATH
+          # 验证安装的版本
+          flutter --version
+          dart --version
 
       - name: 最终验证Dart版本（确保≥3.10.7）
         run: |
           DART_VERSION=$(dart --version | grep -oE '3\.[0-9]+\.[0-9]+')
           echo "✅ 当前Dart版本：$DART_VERSION"
-          # 放宽校验：只要≥3.10.7即可
-          REQUIRED_MAJOR=3
-          REQUIRED_MINOR=10
-          REQUIRED_PATCH=7
-          # 拆分版本号
+          # 拆分版本号做精准对比
           IFS='.' read -r MAJOR MINOR PATCH <<< "$DART_VERSION"
-          # 版本对比逻辑
-          if [ "$MAJOR" -gt "$REQUIRED_MAJOR" ] || \
-             [ "$MAJOR" -eq "$REQUIRED_MAJOR" -a "$MINOR" -gt "$REQUIRED_MINOR" ] || \
-             [ "$MAJOR" -eq "$REQUIRED_MAJOR" -a "$MINOR" -eq "$REQUIRED_MINOR" -a "$PATCH" -ge "$REQUIRED_PATCH" ]; then
+          if [ "$MAJOR" -ge 3 ] && [ "$MINOR" -ge 10 ] && [ "$PATCH" -ge 7 ]; then
             echo "✅ Dart版本满足要求（≥3.10.7）"
           else
             echo "❌ Dart版本不足：$DART_VERSION < 3.10.7"
