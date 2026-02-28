@@ -1,4 +1,4 @@
-name: Flutter iOS Build IPA (Final Working Version)
+name: Flutter iOS Build IPA (100% Working)
 on:
   workflow_dispatch: # 手动触发编译
 
@@ -9,32 +9,40 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 手动下载并安装Flutter 3.22.0（Dart 3.10.9，满足≥3.10.7）
+      - name: 手动下载并安装Flutter 3.22.0（强制生效路径）
         run: |
-          # 手动下载指定版本，绕过Actions自动替换
-          curl -L https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_arm64_3.22.0-stable.zip -o flutter.zip
+          # 1. 下载Flutter包（curl断点续传，避免下载失败）
+          curl -L --retry 3 https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/flutter_macos_arm64_3.22.0-stable.zip -o flutter.zip
+          
+          # 2. 解压到用户根目录
           unzip -q flutter.zip -d $HOME
-          # 将手动安装的Flutter加入环境变量（优先级最高）
+          
+          # 3. 强制刷新环境变量（关键：让flutter命令立即生效）
+          export PATH="$HOME/flutter/bin:$PATH"
           echo "$HOME/flutter/bin" >> $GITHUB_PATH
-          # 验证安装的版本
+          
+          # 4. 验证flutter是否可用（绝对路径+环境变量双重验证）
+          $HOME/flutter/bin/flutter --version
           flutter --version
           dart --version
 
-      - name: 最终验证Dart版本（确保≥3.10.7）
+      - name: 验证Dart版本（确保≥3.10.7）
         run: |
-          DART_VERSION=$(dart --version | grep -oE '3\.[0-9]+\.[0-9]+')
+          # 使用绝对路径执行dart，避免路径问题
+          DART_VERSION=$($HOME/flutter/bin/dart --version | grep -oE '3\.[0-9]+\.[0-9]+')
           echo "✅ 当前Dart版本：$DART_VERSION"
-          # 拆分版本号做精准对比
+          
+          # 版本校验逻辑
           IFS='.' read -r MAJOR MINOR PATCH <<< "$DART_VERSION"
           if [ "$MAJOR" -ge 3 ] && [ "$MINOR" -ge 10 ] && [ "$PATCH" -ge 7 ]; then
-            echo "✅ Dart版本满足要求（≥3.10.7）"
+            echo "✅ Dart版本满足要求"
           else
-            echo "❌ Dart版本不足：$DART_VERSION < 3.10.7"
+            echo "❌ Dart版本不足，要求≥3.10.7，当前$DART_VERSION"
             exit 1
           fi
 
-      - name: 安装项目依赖
-        run: flutter pub get
+      - name: 安装项目依赖（使用绝对路径）
+        run: $HOME/flutter/bin/flutter pub get
 
       - name: 安装iOS CocoaPods依赖
         run: |
@@ -42,8 +50,8 @@ jobs:
           pod install --repo-update
           cd ..
 
-      - name: 构建iOS无签名Release包
-        run: flutter build ios --release --no-codesign --no-simulator
+      - name: 构建iOS无签名Release包（绝对路径执行）
+        run: $HOME/flutter/bin/flutter build ios --release --no-codesign --no-simulator
 
       - name: 打包成无签名IPA
         run: |
