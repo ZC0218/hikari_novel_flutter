@@ -16,24 +16,30 @@ jobs:
         with:
           flutter-version: '3.38.7'
 
-      # ❗ 强制修复插件版本（关键！！）
-      - name: 🔧 Fix device_info_plus version
+      # ✅ 强制覆盖依赖（核心！！！）
+      - name: 🔧 Force fix device_info_plus
         run: |
-          sed -i '' '/device_info_plus/d' pubspec.yaml
-          echo "device_info_plus: 10.1.0" >> pubspec.yaml
+          echo "" >> pubspec.yaml
+          echo "dependency_overrides:" >> pubspec.yaml
+          echo "  device_info_plus: 10.1.0" >> pubspec.yaml
 
-      # ❗ 清理旧缓存（必须）
+      # ✅ 清缓存（必须）
       - name: 🧹 Clean Flutter
         run: flutter clean
 
-      - name: 📦 Install dependencies
+      - name: 📦 Get Packages
         run: flutter pub get
 
-      # ❗ 删除 Pods（避免旧编译缓存）
-      - name: 🧹 Clean iOS Pods
+      # ✅ 确认版本（调试用，可留）
+      - name: 🔍 Check device_info_plus version
+        run: flutter pub deps | grep device_info_plus
+
+      # ✅ 清理 iOS 构建缓存
+      - name: 🧹 Clean iOS
         run: |
           rm -rf ios/Pods
           rm -rf ios/Podfile.lock
+          rm -rf ~/Library/Developer/Xcode/DerivedData
 
       - name: 🔧 Install Pods
         run: |
@@ -46,7 +52,7 @@ jobs:
       - name: 🚀 Build iOS (no codesign)
         run: flutter build ios --release --no-codesign
 
-      # 📦 打包 IPA
+      # 📦 打 IPA
       - name: 📦 Create IPA
         run: |
           mkdir Payload
