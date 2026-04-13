@@ -11,25 +11,39 @@ jobs:
       - name: 📥 Checkout
         uses: actions/checkout@v4
 
+      # ✅ 用新版 Flutter（关键修复）
       - name: 🧰 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.38.8'   # 可根据项目 pubspec 调整
+          flutter-version: '3.38.7'
 
-      - name: 📦 Install dependencies
+      - name: 📦 Flutter Pub Get
         run: flutter pub get
 
-      - name: 🔧 iOS 依赖
+      # ✅ 强制升级依赖（修复 device_info_plus）
+      - name: 🔄 Upgrade Dependencies
+        run: flutter pub upgrade
+
+      # ✅ 清理缓存（避免旧插件残留）
+      - name: 🧹 Clean
+        run: flutter clean
+
+      - name: 📦 Get Packages Again
+        run: flutter pub get
+
+      # ✅ CocoaPods 修复
+      - name: 🔧 Install Pods
         run: |
           cd ios
+          pod repo update
           pod install
           cd ..
 
-      # 🚨 关键：未签名构建
+      # 🚀 未签名构建
       - name: 🚀 Build iOS (no codesign)
         run: flutter build ios --release --no-codesign
 
-      # 📦 手动打包 IPA
+      # 📦 打包 IPA
       - name: 📦 Create IPA
         run: |
           mkdir Payload
