@@ -1,66 +1,45 @@
-name: Build iOS IPA (Unsigned)
-
+name: Build Unsigned IPA
+run-name: Build Flutter Unsigned IPA
 on:
-  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: # 支持手动在网页触发构建
 
 jobs:
-  build:
+  build-ios:
     runs-on: macos-latest
-
     steps:
-      - name: 📥 Checkout
+      - name: 检出代码仓库
         uses: actions/checkout@v4
 
-      - name: 🧰 Setup Flutter
+      - name: 配置 Flutter 环境
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.38.7'
+          flutter-version: '3.22.0' # 可自行修改适配项目的Flutter版本
+          cache: true
 
-      # ✅ 强制覆盖依赖（核心！！！）
-      - name: 🔧 Force fix device_info_plus
-        run: |
-          echo "" >> pubspec.yaml
-          echo "dependency_overrides:" >> pubspec.yaml
-          echo "  device_info_plus: 10.1.0" >> pubspec.yaml
-
-      # ✅ 清缓存（必须）
-      - name: 🧹 Clean Flutter
-        run: flutter clean
-
-      - name: 📦 Get Packages
-        run: flutter pub get
-
-      # ✅ 确认版本（调试用，可留）
-      - name: 🔍 Check device_info_plus version
-        run: flutter pub deps | grep device_info_plus
-
-      # ✅ 清理 iOS 构建缓存
-      - name: 🧹 Clean iOS
-        run: |
-          rm -rf ios/Pods
-          rm -rf ios/Podfile.lock
-          rm -rf ~/Library/Developer/Xcode/DerivedData
-
-      - name: 🔧 Install Pods
+      - name: 安装 CocoaPods 依赖
         run: |
           cd ios
-          pod repo update
-          pod install
-          cd ..
+          pod install --repo-update
 
-      # 🚀 构建
-      - name: 🚀 Build iOS (no codesign)
-        run: flutter build ios --release --no-codesign
+      - name: Flutter 清理缓存
+        run: flutter clean
 
-      # 📦 打 IPA
-      - name: 📦 Create IPA
+      - name: 获取项目依赖
+        run: flutter pub get
+
+      - name: 编译未签名 IPA
         run: |
-          mkdir Payload
-          cp -r build/ios/iphoneos/Runner.app Payload/
-          zip -r app.ipa Payload
+          # --no-codesign 生成无签名IPA，仅用于测试分发，无法直接安装真机
+          flutter build ipa --no-codesign --release
+          ls -la build/ios/ipa/
 
-      - name: 📤 Upload IPA
+      - name: 上传 IPA 制品到工作流
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-ipa
-          path: app.ipa
+          name: unsigned-ipa-file
+          path: build/ios/ipa/*.ipa
+          retention-days: 30
