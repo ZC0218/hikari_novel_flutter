@@ -41,13 +41,15 @@ jobs:
       - name: 拉取pub依赖
         run: flutter pub get
 
-      - name: 安装iOS Pod依赖
+      - name: 修正Pod最低iOS部署版本为13.0（解决版本9.0报错）
         run: |
           cd ios
+          # 修改Podfile全局最低版本
+          sed -i '' 's/platform :ios, .*/platform :ios, "13.0"/' Podfile
           pod repo update
           pod install --verbose
 
-      # 直接Xcode编译，移除所有assemble前置步骤，Xcode自动处理Flutter编译
+      # Xcode编译，全量关闭签名/Team校验
       - name: Xcode编译无签名真机App
         run: |
           cd ios
@@ -60,6 +62,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM="" \
+            IPHONEOS_DEPLOYMENT_TARGET=13.0 \
             build
 
       # 手动组装标准无签名IPA
