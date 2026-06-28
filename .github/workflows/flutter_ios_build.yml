@@ -47,21 +47,22 @@ jobs:
           pod repo update
           pod install --verbose
 
-      # 仅生成xcarchive归档，不尝试自动导出ipa
-      - name: 构建无签名Xcode归档包
-        run: flutter build ipa --release --no-codesign
+      # 编译模拟器版本App（无需Team、无需证书，不会触发团队校验）
+      - name: 编译iOS模拟器App
+        run: flutter build ios --simulator --release
 
-      # 核心修复：手动组装无签名IPA，绕过exportArchive Team校验
-      - name: 手动组装未签名IPA
+      # 1. 创建IPA标准目录结构
+      # 2. 复制模拟器App
+      # 3. 剥离x86_64模拟器架构，仅保留arm64真机架构
+      # 4. 压缩为无签名IPA
+      - name: 剥离模拟器架构，生成无签名IPA
         run: |
-          # 创建目录结构
           mkdir -p build/ios/tmp/Payload
-          # 从归档包拷贝App文件
-          cp -r build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app build/ios/tmp/Payload/
-          # 进入临时目录压缩为ipa
+          cp -r build/ios/Build/Products/Release-iphonesimulator/Runner.app build/ios/tmp/Payload/
+          # 移除模拟器x86_64架构，仅保留arm64真机架构
+          lipo -remove x86_64 build/ios/tmp/Payload/Runner.app/Runner -output build/ios/tmp/Payload/Runner.app/Runner
           cd build/ios/tmp
           zip -qr unsigned-hikari-novel.ipa Payload
-          # 移动到ipa输出目录
           mkdir -p ../ipa
           mv unsigned-hikari-novel.ipa ../ipa/
           cd ../../../
