@@ -23,37 +23,33 @@ jobs:
           channel: stable
           cache: true
 
-      # 3. 预接受Android证书，消除doctor警告
-      - name: 接受Android SDK许可
-        run: flutter doctor --android-licenses -y
-
-      # 4. 校验完整Flutter环境
+      # 3. 校验完整Flutter环境（移除带-y的错误许可步骤）
       - name: Flutter环境校验
         run: flutter doctor -v
 
-      # 5. 清理缓存 + 拉取项目依赖（关键：自动生成ios/Podfile）
+      # 4. 清理缓存 + 拉取项目依赖（自动生成ios/Podfile，解决之前Podfile缺失报错）
       - name: 清理项目缓存
         run: flutter clean
 
       - name: 拉取pub依赖，生成iOS工程文件
         run: flutter pub get
 
-      # 6. 安装CocoaPods（此时Podfile已自动生成）
+      # 5. 安装CocoaPods（Podfile已由pub get生成）
       - name: 安装iOS Pod依赖
         run: |
           cd ios
           pod repo update
           pod install --verbose
 
-      # 7. 编译Release无签名IPA
+      # 6. 编译Release无签名IPA，仅arm64架构适配新版macOS runner
       - name: 构建未签名Release IPA
         run: flutter build ipa --release --no-codesign --target-platform=ios-arm64
 
-      # 8. 打印构建产物目录
+      # 7. 打印构建产物目录
       - name: 查看生成IPA文件
         run: ls -lh build/ios/ipa/
 
-      # 9. 上传IPA到工作流制品
+      # 8. 上传IPA到工作流制品
       - name: 上传未签名IPA文件
         uses: actions/upload-artifact@v4
         with:
