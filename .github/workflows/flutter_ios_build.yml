@@ -1,51 +1,62 @@
-name: Build Unsigned IPA Flutter 3.38.7
-run-name: Build Unsigned IPA (Flutter 3.38.7)
+name: Build Unsigned IPA (Flutter 3.38.7)
+run-name: 编译无签名IPA | Flutter 3.38.7 Stable
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch: # 网页手动运行
+  workflow_dispatch: # 支持网页手动触发构建
 
 jobs:
-  build-ios-unsigned:
+  build_ios_unsigned:
     runs-on: macos-latest
     steps:
-      - name: 拉取仓库源码
+      # 1. 拉取仓库全部源码
+      - name: 检出仓库代码
         uses: actions/checkout@v4
 
-      - name: 安装 Flutter 3.38.7
+      # 2. 配置对应版本Flutter（匹配作者本地3.38.7 stable）
+      - name: 安装 Flutter 3.38.7 Stable
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.38.7'
           channel: stable
           cache: true
 
-      - name: 查看 Flutter 环境校验
+      # 3. 预接受Android证书，消除doctor警告
+      - name: 接受Android SDK许可
+        run: flutter doctor --android-licenses -y
+
+      # 4. 校验完整Flutter环境
+      - name: Flutter环境校验
         run: flutter doctor -v
 
-      - name: 安装 iOS Pod 依赖
-        run: |
-          cd ios
-          pod repo update
-          pod install
-
+      # 5. 清理缓存 + 拉取项目依赖（关键：自动生成ios/Podfile）
       - name: 清理项目缓存
         run: flutter clean
 
-      - name: 拉取项目 pub 依赖
+      - name: 拉取pub依赖，生成iOS工程文件
         run: flutter pub get
 
-      - name: 构建 Release 未签名 IPA
-        run: flutter build ipa --release --no-codesign
-        # --no-codesign 生成无签名IPA，无开发者证书
+      # 6. 安装CocoaPods（此时Podfile已自动生成）
+      - name: 安装iOS Pod依赖
+        run: |
+          cd ios
+          pod repo update
+          pod install --verbose
 
-      - name: 输出IPA文件列表
+      # 7. 编译Release无签名IPA
+      - name: 构建未签名Release IPA
+        run: flutter build ipa --release --no-codesign --target-platform=ios-arm64
+
+      # 8. 打印构建产物目录
+      - name: 查看生成IPA文件
         run: ls -lh build/ios/ipa/
 
-      - name: 上传未签名IPA制品
+      # 9. 上传IPA到工作流制品
+      - name: 上传未签名IPA文件
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-ipa-flutter3.38.7
+          name: unsigned-hikari-novel-ipa-flutter3.38.7
           path: build/ios/ipa/*.ipa
           retention-days: 30
