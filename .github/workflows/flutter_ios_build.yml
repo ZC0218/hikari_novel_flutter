@@ -1,45 +1,51 @@
-name: Build Unsigned IPA
-run-name: Build Flutter Unsigned IPA
+name: Build Unsigned IPA Flutter 3.38.7
+run-name: Build Unsigned IPA (Flutter 3.38.7)
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch: # 支持手动在网页触发构建
+  workflow_dispatch: # 网页手动运行
 
 jobs:
-  build-ios:
+  build-ios-unsigned:
     runs-on: macos-latest
     steps:
-      - name: 检出代码仓库
+      - name: 拉取仓库源码
         uses: actions/checkout@v4
 
-      - name: 配置 Flutter 环境
+      - name: 安装 Flutter 3.38.7
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.38.7' # 可自行修改适配项目的Flutter版本
+          flutter-version: '3.38.7'
+          channel: stable
           cache: true
 
-      - name: 安装 CocoaPods 依赖
+      - name: 查看 Flutter 环境校验
+        run: flutter doctor -v
+
+      - name: 安装 iOS Pod 依赖
         run: |
           cd ios
-          pod install --repo-update
+          pod repo update
+          pod install
 
-      - name: Flutter 清理缓存
+      - name: 清理项目缓存
         run: flutter clean
 
-      - name: 获取项目依赖
+      - name: 拉取项目 pub 依赖
         run: flutter pub get
 
-      - name: 编译未签名 IPA
-        run: |
-          # --no-codesign 生成无签名IPA，仅用于测试分发，无法直接安装真机
-          flutter build ipa --no-codesign --release
-          ls -la build/ios/ipa/
+      - name: 构建 Release 未签名 IPA
+        run: flutter build ipa --release --no-codesign
+        # --no-codesign 生成无签名IPA，无开发者证书
 
-      - name: 上传 IPA 制品到工作流
+      - name: 输出IPA文件列表
+        run: ls -lh build/ios/ipa/
+
+      - name: 上传未签名IPA制品
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-ipa-file
+          name: unsigned-ipa-flutter3.38.7
           path: build/ios/ipa/*.ipa
           retention-days: 30
