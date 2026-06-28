@@ -38,64 +38,61 @@ jobs:
       - name: 清理项目缓存
         run: flutter clean
 
+      # ========== 核心修复：强制降级 device_info_plus，解决 isiOSAppOnVision 编译报错 ==========
+      - name: 强制降级device_info_plus插件（解决VisionOS API兼容问题）
+        run: |
+          # 在pubspec.yaml末尾追加 dependency_overrides，强制使用11.2.1版本（无VisionOS API）
+          cat >> pubspec.yaml << 'EOF'
+
+          dependency_overrides:
+            device_info_plus: 11.2.1
+          EOF
+          echo "已追加dependency_overrides，device_info_plus将强制使用11.2.1版本"
+
       - name: 拉取pub依赖
         run: flutter pub get
 
-      # 只修改Podfile的iOS版本号，不改动post_install结构
-      - name: 修改Podfile最低版本并安装依赖
+      - name: 修改Podfile版本并安装依赖
         run: |
           cd ios
-          # 仅修改全局最低iOS版本为13.0，不动其他结构
           sed -i '' 's/platform :ios, .*/platform :ios, "13.0"/' Podfile
           pod repo update
           pod install --verbose
 
-      # 核心修复：pod install后，直接批量修改Pods项目的编译配置
-      - name: 批量修正Pods项目编译设置
+      # 批量修正所有项目的签名/版本配置
+      - name: 批量修正所有项目签名/版本配置
         run: |
           cd ios
           
-          # 批量替换所有Pod的最低部署版本为13.0
+          # 1. 修改主项目 Runner.xcodeproj：清空Team、禁用签名、设置部署版本
+          sed -i '' 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g' Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 11.0;/IPHONEOS_DEPLOYMENT_TARGET = 13.0;/g' Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 12.0;/IPHONEOS_DEPLOYMENT_TARGET = 13.0;/g' Runner.xcodeproj/project.pbxproj
+          
+          # 2. 修改Pods项目：清空Team、禁用签名、统一部署版本13.0、统一Swift5.0
+          sed -i '' 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g' Pods/Pods.xcodeproj/project.pbxproj
+          sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' Pods/Pods.xcodeproj/project.pbxproj
           sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 9.0;/IPHONEOS_DEPLOYMENT_TARGET = 13.0;/g' Pods/Pods.xcodeproj/project.pbxproj
           sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 10.0;/IPHONEOS_DEPLOYMENT_TARGET = 13.0;/g' Pods/Pods.xcodeproj/project.pbxproj
           sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 11.0;/IPHONEOS_DEPLOYMENT_TARGET = 13.0;/g' Pods/Pods.xcodeproj/project.pbxproj
           sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 12.0;/IPHONEOS_DEPLOYMENT_TARGET = 13.0;/g' Pods/Pods.xcodeproj/project.pbxproj
-          
-          # 批量设置Swift版本为5.0
           sed -i '' 's/SWIFT_VERSION = 4.0;/SWIFT_VERSION = 5.0;/g' Pods/Pods.xcodeproj/project.pbxproj
           sed -i '' 's/SWIFT_VERSION = 4.2;/SWIFT_VERSION = 5.0;/g' Pods/Pods.xcodeproj/project.pbxproj
-          sed -i '' 's/SWIFT_VERSION = 5.0;/SWIFT_VERSION = 5.0;/g' Pods/Pods.xcodeproj/project.pbxproj
           
-          # 批量禁用所有Pod的签名
-          sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' Pods/Pods.xcodeproj/project.pbxproj
-          
-          echo "Pods项目配置修正完成"
+          echo "所有项目配置修正完成"
 
-      # Xcode编译，全量参数覆盖
-      - name: Xcode编译无签名真机App
+      # 改用 Flutter 官方命令编译 .app
+      - name: Flutter编译无签名真机App
         run: |
-          cd ios
-          xcodebuild \
-            -workspace Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -destination generic/platform=iOS \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            DEVELOPMENT_TEAM="" \
-            IPHONEOS_DEPLOYMENT_TARGET=13.0 \
-            SWIFT_VERSION=5.0 \
-            GCC_TREAT_WARNINGS_AS_ERRORS=NO \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=NO \
-            ENABLE_BITCODE=NO \
-            build
+          flutter build ios --release --no-codesign
+          ls -lh build/ios/Release-iphoneos/
 
-      # 手动组装标准无签名IPA
+      # 手动组装标准IPA
       - name: 打包IPA
         run: |
           mkdir -p build/ios/tmp/Payload
-          cp -r ios/build/Release-iphoneos/Runner.app build/ios/tmp/Payload/
+          cp -r build/ios/Release-iphoneos/Runner.app build/ios/tmp/Payload/
           cd build/ios/tmp
           zip -qr unsigned-hikari-novel.ipa Payload
           mkdir -p ../ipa
