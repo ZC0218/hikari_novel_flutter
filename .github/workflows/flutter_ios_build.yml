@@ -47,11 +47,7 @@ jobs:
           pod repo update
           pod install --verbose
 
-      # 修复：移除无效 --release 参数，assemble 正确写法
-      - name: Flutter前置编译
-        run: flutter assemble ios-arm64 --output build/flutter_assemble
-
-      # Xcode底层编译，强制关闭签名/Team校验
+      # 直接Xcode编译，移除所有assemble前置步骤，Xcode自动处理Flutter编译
       - name: Xcode编译无签名真机App
         run: |
           cd ios
