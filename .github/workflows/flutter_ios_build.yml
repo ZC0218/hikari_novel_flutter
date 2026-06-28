@@ -5,17 +5,15 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch: # 支持网页手动触发构建
+  workflow_dispatch:
 
 jobs:
   build_ios_unsigned:
     runs-on: macos-latest
     steps:
-      # 1. 拉取仓库全部源码
       - name: 检出仓库代码
         uses: actions/checkout@v4
 
-      # 2. 配置对应版本Flutter（匹配作者本地3.38.7 stable）
       - name: 安装 Flutter 3.38.7 Stable
         uses: subosito/flutter-action@v2
         with:
@@ -23,7 +21,6 @@ jobs:
           channel: stable
           cache: true
 
-      # 动态找到系统Xcode 16，避免硬编码路径报错
       - name: 自动切换Xcode 16
         run: |
           XCODE_PATH=$(find /Applications -name "Xcode*.app" -maxdepth 1 | grep -E "Xcode.*16" | head -1)
@@ -35,45 +32,43 @@ jobs:
           fi
           xcodebuild -version
 
-      # 3. 校验完整Flutter环境
       - name: Flutter环境校验
         run: flutter doctor -v
 
-      # 4. 清理缓存 + 拉取项目依赖（自动生成ios/Podfile）
       - name: 清理项目缓存
         run: flutter clean
 
-      - name: 拉取pub依赖，生成iOS工程文件
+      - name: 拉取pub依赖
         run: flutter pub get
 
-      # 5. 安装CocoaPods
       - name: 安装iOS Pod依赖
         run: |
           cd ios
           pod repo update
           pod install --verbose
 
-      # 6. 构建归档包（--no-codesign仅输出xcarchive，不会生成ipa）
+      # 仅生成xcarchive归档，不尝试自动导出ipa
       - name: 构建无签名Xcode归档包
         run: flutter build ipa --release --no-codesign
 
-      # 7. 手动从xcarchive导出未签名IPA（核心修复步骤）
-      - name: 手动导出未签名IPA
+      # 核心修复：手动组装无签名IPA，绕过exportArchive Team校验
+      - name: 手动组装未签名IPA
         run: |
-          mkdir -p build/ios/ipa
-          xcodebuild -exportArchive \
-            -archivePath build/ios/archive/Runner.xcarchive \
-            -exportPath build/ios/ipa \
-            -exportOptionsPlist ios/ExportOptions.plist \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+          # 创建目录结构
+          mkdir -p build/ios/tmp/Payload
+          # 从归档包拷贝App文件
+          cp -r build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app build/ios/tmp/Payload/
+          # 进入临时目录压缩为ipa
+          cd build/ios/tmp
+          zip -qr unsigned-hikari-novel.ipa Payload
+          # 移动到ipa输出目录
+          mkdir -p ../ipa
+          mv unsigned-hikari-novel.ipa ../ipa/
+          cd ../../../
 
-      # 8. 打印生成IPA文件列表
       - name: 查看生成IPA文件
         run: ls -lh build/ios/ipa/
 
-      # 9. 上传IPA到工作流制品
       - name: 上传未签名IPA文件
         uses: actions/upload-artifact@v4
         with:
