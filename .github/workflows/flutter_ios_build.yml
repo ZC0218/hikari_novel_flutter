@@ -26,7 +26,6 @@ jobs:
       # 动态找到系统Xcode 16，避免硬编码路径报错
       - name: 自动切换Xcode 16
         run: |
-          # 列出所有Xcode并选中16版本
           XCODE_PATH=$(find /Applications -name "Xcode*.app" -maxdepth 1 | grep -E "Xcode.*16" | head -1)
           if [ -z "$XCODE_PATH" ]; then
             echo "未找到Xcode16，使用系统默认Xcode"
@@ -54,15 +53,27 @@ jobs:
           pod repo update
           pod install --verbose
 
-      # 6. 构建未签名IPA
-      - name: 构建未签名Release IPA
+      # 6. 构建归档包（--no-codesign仅输出xcarchive，不会生成ipa）
+      - name: 构建无签名Xcode归档包
         run: flutter build ipa --release --no-codesign
 
-      # 7. 打印构建产物目录
+      # 7. 手动从xcarchive导出未签名IPA（核心修复步骤）
+      - name: 手动导出未签名IPA
+        run: |
+          mkdir -p build/ios/ipa
+          xcodebuild -exportArchive \
+            -archivePath build/ios/archive/Runner.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist ios/ExportOptions.plist \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      # 8. 打印生成IPA文件列表
       - name: 查看生成IPA文件
         run: ls -lh build/ios/ipa/
 
-      # 8. 上传IPA到工作流制品
+      # 9. 上传IPA到工作流制品
       - name: 上传未签名IPA文件
         uses: actions/upload-artifact@v4
         with:
