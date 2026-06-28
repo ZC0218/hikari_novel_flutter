@@ -17,7 +17,7 @@ jobs:
       - name: 配置 Flutter 环境
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.0' # 可自行修改适配项目的Flutter版本
+          flutter-version: '3.38.7' # 可自行修改适配项目的Flutter版本
           cache: true
 
       - name: 安装 CocoaPods 依赖
