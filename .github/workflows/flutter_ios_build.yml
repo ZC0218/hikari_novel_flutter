@@ -23,9 +23,18 @@ jobs:
           channel: stable
           cache: true
 
-      # 强制切换Xcode 16.4，适配device_info_plus 12.4.0所需iOS18 SDK
-      - name: 指定Xcode 16.4
-        run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+      # 动态找到系统Xcode 16，避免硬编码路径报错
+      - name: 自动切换Xcode 16
+        run: |
+          # 列出所有Xcode并选中16版本
+          XCODE_PATH=$(find /Applications -name "Xcode*.app" -maxdepth 1 | grep -E "Xcode.*16" | head -1)
+          if [ -z "$XCODE_PATH" ]; then
+            echo "未找到Xcode16，使用系统默认Xcode"
+          else
+            sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+            echo "已切换至 $XCODE_PATH"
+          fi
+          xcodebuild -version
 
       # 3. 校验完整Flutter环境
       - name: Flutter环境校验
@@ -45,7 +54,7 @@ jobs:
           pod repo update
           pod install --verbose
 
-      # 6. 构建未签名IPA，移除所有不兼容参数
+      # 6. 构建未签名IPA
       - name: 构建未签名Release IPA
         run: flutter build ipa --release --no-codesign
 
