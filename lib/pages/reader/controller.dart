@@ -12,7 +12,7 @@ import 'package:hikari_novel_flutter/common/extension.dart';
 import 'package:hikari_novel_flutter/models/dual_page_mode.dart';
 import 'package:hikari_novel_flutter/models/reader_direction.dart';
 import 'package:hikari_novel_flutter/models/resource.dart';
-import 'package:hikari_novel_flutter/network/parser.dart';
+import 'package:hikari_novel_flutter/parser/parser.dart';
 import 'package:hikari_novel_flutter/pages/novel_detail/controller.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
@@ -24,7 +24,7 @@ import '../../common/database/database.dart';
 import '../../common/log.dart';
 import '../../models/cat_volume.dart';
 import '../../models/page_state.dart';
-import '../../network/api.dart';
+import '../../service/api_service.dart';
 import '../../service/db_service.dart';
 import '../../service/local_storage_service.dart';
 import 'widgets/paper_curl_pager.dart';
@@ -211,7 +211,7 @@ class ReaderController extends GetxController {
   }
 
   Future<void> _getContentByNetwork() async {
-    final result = await Api.getNovelContent(aid: aid, cid: cid);
+    final result = await ApiService.instance.getNovelContent(aid: aid, cid: cid);
     switch (result) {
       case Success():
         {
@@ -509,10 +509,10 @@ class ReaderController extends GetxController {
 
   Future<bool?> pickTextStyleFile() async {
     try {
-      final result = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['ttf', 'otf']);
-      if (result == null) return null; // 用户取消
+      final file = await FilePicker.pickFile(type: FileType.custom, allowedExtensions: ['ttf', 'otf']);
+      if (file == null) return null; // 用户取消
 
-      final tempPath = result.files.single.path!;
+      final tempPath = file.path!;
 
       await deleteFontDir();
 
@@ -595,10 +595,10 @@ class ReaderController extends GetxController {
 
   Future<bool?> pickBgImageFile(bool isDark) async {
     try {
-      final result = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['jpg', 'png', 'jpeg']);
-      if (result == null) return null; // 用户取消
+      final file = await FilePicker.pickFile(type: FileType.custom, allowedExtensions: ['jpg', 'png', 'jpeg']);
+      if (file == null) return null; // 用户取消
 
-      final tempPath = result.files.single.path!;
+      final tempPath = file.path!;
 
       final srcFile = File(tempPath);
       final ext = path.extension(tempPath);
