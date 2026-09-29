@@ -1,110 +1,142 @@
-name: Build Unsigned IPA (Flutter 3.38.7)
-run-name: 编译无签名IPA | Flutter 3.38.7 Stable
+name: Build Hikari Novel iOS Unsigned IPA
+
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.47.4"
+
+  # 项目实际 Beta 版本
+  DISPLAY_VERSION: "0.5.0-beta.1+13"
+
+  # iOS 合法版本号
+  IOS_VERSION: "0.5.0"
+  IOS_BUILD_NUMBER: "13"
+
 jobs:
-  build_ios_unsigned:
-    runs-on: macos-latest
+  build-ios:
+    name: Build Unsigned IPA
+    runs-on: macos-26
+
     steps:
-      - name: 检出仓库代码
-        uses: actions/checkout@v4
+      # 1. 拉取源码
+      - name: Checkout
+        uses: actions/checkout@v7
 
-      - name: 安装 Flutter 3.38.7 Stable
-        uses: subosito/flutter-action@v2
+      # 2. 安装指定 Flutter 版本
+      - name: Setup Flutter
+        uses: flutter-actions/setup-flutter@v4
         with:
-          flutter-version: '3.38.7'
           channel: stable
+          version: ${{ env.FLUTTER_VERSION }}
           cache: true
+          cache-sdk: true
 
-      - name: 自动切换Xcode 16
+      # 3. 检查 Flutter 环境
+      - name: Flutter Doctor
         run: |
-          XCODE_PATH=$(find /Applications -name "Xcode*.app" -maxdepth 1 | grep -E "Xcode.*16" | head -1)
-          if [ -z "$XCODE_PATH" ]; then
-            echo "未找到Xcode16，使用系统默认Xcode"
-          else
-            sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
-            echo "已切换至 $XCODE_PATH"
+          flutter --version
+          flutter doctor -v
+
+      # 4. 开启 iOS
+      - name: Enable iOS
+        run: |
+          flutter config --enable-ios
+          flutter precache --ios
+
+      # 5. 安装 Dart / Flutter 依赖
+      - name: Flutter Pub Get
+        run: |
+          flutter pub get
+
+      # 6. 构建 iOS Release
+      # --no-codesign = 不进行 Apple Developer 签名
+      - name: Build iOS Release
+        run: |
+          flutter build ios \
+            --release \
+            --no-codesign \
+            --build-name="${{ env.IOS_VERSION }}" \
+            --build-number="${{ env.IOS_BUILD_NUMBER }}"
+
+      # 7. 检查构建结果
+      - name: Verify App
+        run: |
+          set -e
+
+          APP_PATH="build/ios/iphoneos/Runner.app"
+
+          if [ ! -d "$APP_PATH" ]; then
+            echo "::error::Runner.app 不存在，iOS 构建失败"
+            exit 1
           fi
-          xcodebuild -version
 
-      - name: Flutter环境校验
-        run: flutter doctor -v
+          echo "===== App Info ====="
 
-      - name: 清理项目缓存
-        run: flutter clean
+          /usr/libexec/PlistBuddy \
+            -c "Print :CFBundleShortVersionString" \
+            "$APP_PATH/Info.plist"
 
-      # ========== 核心修复：强制降级 device_info_plus，解决 isiOSAppOnVision 编译报错 ==========
-      - name: 强制降级device_info_plus插件（解决VisionOS API兼容问题）
+          /usr/libexec/PlistBuddy \
+            -c "Print :CFBundleVersion" \
+            "$APP_PATH/Info.plist"
+
+          echo "===================="
+
+      # 8. 打包成未签名 IPA
+      - name: Package Unsigned IPA
         run: |
-          # 在pubspec.yaml末尾追加 dependency_overrides，强制使用11.2.1版本（无VisionOS API）
-          cat >> pubspec.yaml << 'EOF'
+          set -e
 
-          dependency_overrides:
-            device_info_plus: 11.2.1
-          EOF
-          echo "已追加dependency_overrides，device_info_plus将强制使用11.2.1版本"
+          APP_PATH="build/ios/iphoneos/Runner.app"
+          WORK_DIR="build/ios/unsigned-ipa"
+          PAYLOAD_DIR="$WORK_DIR/Payload"
 
-      - name: 拉取pub依赖
-        run: flutter pub get
+          mkdir -p "$PAYLOAD_DIR"
 
-      - name: 修改Podfile版本并安装依赖
+          cp -R "$APP_PATH" "$PAYLOAD_DIR/Runner.app"
+
+          IPA_NAME="HikariNovel-${{ env.DISPLAY_VERSION }}-unsigned.ipa"
+
+          cd "$WORK_DIR"
+
+          zip -qry "$IPA_NAME" Payload
+
+          mv "$IPA_NAME" "../../$IPA_NAME"
+
+          echo "======================================"
+          echo "IPA 已生成："
+          echo "build/ios/$IPA_NAME"
+          echo "======================================"
+
+          ls -lh "../../$IPA_NAME"
+
+      # 9. 检查 IPA 内容
+      - name: Verify IPA
         run: |
-          cd ios
-          sed -i '' 's/platform :ios, .*/platform :ios, "13.0"/' Podfile
-          pod repo update
-          pod install --verbose
+          set -e
 
-      # 批量修正所有项目的签名/版本配置
-      - name: 批量修正所有项目签名/版本配置
-        run: |
-          cd ios
-          
-          # 1. 修改主项目 Runner.xcodeproj：清空Team、禁用签名、设置部署版本
-          sed -i '' 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g' Runner.xcodeproj/project.pbxproj
-          sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' Runner.xcodeproj/project.pbxproj
-          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 11.0;/IPHONEOS_DEPLOYMENT_TARGET = 13.0;/g' Runner.xcodeproj/project.pbxproj
-          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 12.0;/IPHONEOS_DEPLOYMENT_TARGET = 13.0;/g' Runner.xcodeproj/project.pbxproj
-          
-          # 2. 修改Pods项目：清空Team、禁用签名、统一部署版本13.0、统一Swift5.0
-          sed -i '' 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g' Pods/Pods.xcodeproj/project.pbxproj
-          sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g' Pods/Pods.xcodeproj/project.pbxproj
-          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 9.0;/IPHONEOS_DEPLOYMENT_TARGET = 13.0;/g' Pods/Pods.xcodeproj/project.pbxproj
-          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 10.0;/IPHONEOS_DEPLOYMENT_TARGET = 13.0;/g' Pods/Pods.xcodeproj/project.pbxproj
-          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 11.0;/IPHONEOS_DEPLOYMENT_TARGET = 13.0;/g' Pods/Pods.xcodeproj/project.pbxproj
-          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 12.0;/IPHONEOS_DEPLOYMENT_TARGET = 13.0;/g' Pods/Pods.xcodeproj/project.pbxproj
-          sed -i '' 's/SWIFT_VERSION = 4.0;/SWIFT_VERSION = 5.0;/g' Pods/Pods.xcodeproj/project.pbxproj
-          sed -i '' 's/SWIFT_VERSION = 4.2;/SWIFT_VERSION = 5.0;/g' Pods/Pods.xcodeproj/project.pbxproj
-          
-          echo "所有项目配置修正完成"
+          IPA_PATH="build/ios/HikariNovel-${{ env.DISPLAY_VERSION }}-unsigned.ipa"
 
-      # 改用 Flutter 官方命令编译 .app
-      - name: Flutter编译无签名真机App
-        run: |
-          flutter build ios --release --no-codesign
-          ls -lh build/ios/Release-iphoneos/
+          if [ ! -f "$IPA_PATH" ]; then
+            echo "::error::IPA 文件不存在"
+            exit 1
+          fi
 
-      # 手动组装标准IPA
-      - name: 打包IPA
-        run: |
-          mkdir -p build/ios/tmp/Payload
-          cp -r build/ios/Release-iphoneos/Runner.app build/ios/tmp/Payload/
-          cd build/ios/tmp
-          zip -qr unsigned-hikari-novel.ipa Payload
-          mkdir -p ../ipa
-          mv unsigned-hikari-novel.ipa ../ipa/
-          cd ../../../
+          echo "===== IPA Contents ====="
 
-      - name: 查看生成IPA文件
-        run: ls -lh build/ios/ipa/
+          unzip -l "$IPA_PATH" | head -80
 
-      - name: 上传未签名IPA文件
-        uses: actions/upload-artifact@v4
+          echo "========================"
+
+      # 10. 上传到 GitHub Actions Artifacts
+      - name: Upload Unsigned IPA
+        uses: actions/upload-artifact@v7
         with:
-          name: unsigned-hikari-novel-ipa-flutter3.38.7
-          path: build/ios/ipa/*.ipa
-          retention-days: 30
+          name: HikariNovel-${{ env.DISPLAY_VERSION }}-unsigned
+          path: build/ios/HikariNovel-${{ env.DISPLAY_VERSION }}-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
