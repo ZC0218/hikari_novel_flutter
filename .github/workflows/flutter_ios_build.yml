@@ -9,10 +9,10 @@ permissions:
 env:
   FLUTTER_VERSION: "3.47.4"
 
-  # 项目实际 Beta 版本
+  # 最终文件名
   DISPLAY_VERSION: "0.5.0-beta.1+13"
 
-  # iOS 合法版本号
+  # iOS 内部版本
   IOS_VERSION: "0.5.0"
   IOS_BUILD_NUMBER: "13"
 
@@ -22,11 +22,17 @@ jobs:
     runs-on: macos-26
 
     steps:
+
+      # ============================================================
       # 1. 拉取源码
+      # ============================================================
       - name: Checkout
         uses: actions/checkout@v7
 
-      # 2. 安装指定 Flutter 版本
+
+      # ============================================================
+      # 2. 安装 Flutter
+      # ============================================================
       - name: Setup Flutter
         uses: flutter-actions/setup-flutter@v4
         with:
@@ -35,25 +41,37 @@ jobs:
           cache: true
           cache-sdk: true
 
+
+      # ============================================================
       # 3. 检查 Flutter 环境
+      # ============================================================
       - name: Flutter Doctor
         run: |
           flutter --version
           flutter doctor -v
 
-      # 4. 开启 iOS
+
+      # ============================================================
+      # 4. 开启 iOS 支持
+      # ============================================================
       - name: Enable iOS
         run: |
           flutter config --enable-ios
           flutter precache --ios
 
-      # 5. 安装 Dart / Flutter 依赖
+
+      # ============================================================
+      # 5. 获取依赖
+      # ============================================================
       - name: Flutter Pub Get
         run: |
           flutter pub get
 
+
+      # ============================================================
       # 6. 构建 iOS Release
-      # --no-codesign = 不进行 Apple Developer 签名
+      #    不进行 Apple 签名
+      # ============================================================
       - name: Build iOS Release
         run: |
           flutter build ios \
@@ -62,81 +80,182 @@ jobs:
             --build-name="${{ env.IOS_VERSION }}" \
             --build-number="${{ env.IOS_BUILD_NUMBER }}"
 
-      # 7. 检查构建结果
+
+      # ============================================================
+      # 7. 检查 Runner.app
+      # ============================================================
       - name: Verify App
         run: |
           set -e
 
           APP_PATH="build/ios/iphoneos/Runner.app"
 
+          echo "======================================"
+          echo "检查 Runner.app"
+          echo "======================================"
+
           if [ ! -d "$APP_PATH" ]; then
-            echo "::error::Runner.app 不存在，iOS 构建失败"
+            echo "::error::Runner.app 不存在"
             exit 1
           fi
 
-          echo "===== App Info ====="
+          echo "Runner.app:"
+          ls -lah "$APP_PATH"
+
+          echo ""
+          echo "===== iOS Version ====="
 
           /usr/libexec/PlistBuddy \
             -c "Print :CFBundleShortVersionString" \
             "$APP_PATH/Info.plist"
 
+          echo ""
+          echo "===== iOS Build ====="
+
           /usr/libexec/PlistBuddy \
             -c "Print :CFBundleVersion" \
             "$APP_PATH/Info.plist"
 
-          echo "===================="
+          echo ""
+          echo "======================================"
+          echo "Runner.app 检查通过"
+          echo "======================================"
 
-      # 8. 打包成未签名 IPA
+
+      # ============================================================
+      # 8. 制作未签名 IPA
+      # ============================================================
       - name: Package Unsigned IPA
         run: |
           set -e
 
           APP_PATH="build/ios/iphoneos/Runner.app"
-          WORK_DIR="build/ios/unsigned-ipa"
-          PAYLOAD_DIR="$WORK_DIR/Payload"
-
-          mkdir -p "$PAYLOAD_DIR"
-
-          cp -R "$APP_PATH" "$PAYLOAD_DIR/Runner.app"
 
           IPA_NAME="HikariNovel-${{ env.DISPLAY_VERSION }}-unsigned.ipa"
 
-          cd "$WORK_DIR"
+          TEMP_DIR="$RUNNER_TEMP/hikari_ipa"
+          PAYLOAD_DIR="$TEMP_DIR/Payload"
 
-          zip -qry "$IPA_NAME" Payload
+          # 清理旧目录
+          rm -rf "$TEMP_DIR"
 
-          mv "$IPA_NAME" "../../$IPA_NAME"
+          # 创建 Payload
+          mkdir -p "$PAYLOAD_DIR"
+
+          # 复制 App
+          cp -R "$APP_PATH" "$PAYLOAD_DIR/Runner.app"
 
           echo "======================================"
+          echo "开始生成 IPA"
+          echo "======================================"
+
+          cd "$TEMP_DIR"
+
+          # IPA 本质就是 Payload/*.app 的 ZIP
+          zip -qry "$GITHUB_WORKSPACE/$IPA_NAME" Payload
+
+          echo ""
           echo "IPA 已生成："
-          echo "build/ios/$IPA_NAME"
+          echo "$GITHUB_WORKSPACE/$IPA_NAME"
+
+          echo ""
+          ls -lh "$GITHUB_WORKSPACE/$IPA_NAME"
+
+          echo ""
+          echo "======================================"
+          echo "IPA 打包完成"
           echo "======================================"
 
-          ls -lh "../../$IPA_NAME"
 
-      # 9. 检查 IPA 内容
+      # ============================================================
+      # 9. 验证 IPA
+      # ============================================================
       - name: Verify IPA
         run: |
           set -e
 
-          IPA_PATH="build/ios/HikariNovel-${{ env.DISPLAY_VERSION }}-unsigned.ipa"
+          IPA_PATH="$GITHUB_WORKSPACE/HikariNovel-${{ env.DISPLAY_VERSION }}-unsigned.ipa"
+
+          echo "======================================"
+          echo "检查 IPA"
+          echo "======================================"
 
           if [ ! -f "$IPA_PATH" ]; then
-            echo "::error::IPA 文件不存在"
+            echo "::error::IPA 文件不存在：$IPA_PATH"
+            echo ""
+            echo "当前目录文件："
+            find "$GITHUB_WORKSPACE" \
+              -maxdepth 3 \
+              -type f \
+              -name "*.ipa" \
+              -print
             exit 1
           fi
 
+          echo "IPA 文件："
+          ls -lh "$IPA_PATH"
+
+          echo ""
           echo "===== IPA Contents ====="
 
-          unzip -l "$IPA_PATH" | head -80
+          unzip -l "$IPA_PATH" | head -100
 
-          echo "========================"
+          echo ""
+          echo "===== 检查 Payload ====="
 
-      # 10. 上传到 GitHub Actions Artifacts
+          if unzip -l "$IPA_PATH" | grep -q "Payload/Runner.app/"; then
+            echo "Payload/Runner.app/ 存在"
+          else
+            echo "::error::IPA 内没有找到 Payload/Runner.app/"
+            exit 1
+          fi
+
+          echo ""
+          echo "======================================"
+          echo "IPA 验证成功"
+          echo "======================================"
+
+
+      # ============================================================
+      # 10. 检查是否确实未签名
+      # ============================================================
+      - name: Check Code Signature
+        run: |
+          set -e
+
+          APP_PATH="build/ios/iphoneos/Runner.app"
+
+          echo "======================================"
+          echo "检查代码签名"
+          echo "======================================"
+
+          if [ -d "$APP_PATH/_CodeSignature" ]; then
+            echo "提示：发现 _CodeSignature 目录"
+            ls -lah "$APP_PATH/_CodeSignature"
+          else
+            echo "未发现 _CodeSignature"
+            echo "这是正常的未签名 App"
+          fi
+
+          echo ""
+          echo "codesign 信息："
+
+          codesign -dv "$APP_PATH" 2>&1 || true
+
+          echo ""
+          echo "======================================"
+          echo "签名检查完成"
+          echo "======================================"
+
+
+      # ============================================================
+      # 11. 上传 IPA
+      # ============================================================
       - name: Upload Unsigned IPA
         uses: actions/upload-artifact@v7
         with:
           name: HikariNovel-${{ env.DISPLAY_VERSION }}-unsigned
-          path: build/ios/HikariNovel-${{ env.DISPLAY_VERSION }}-unsigned.ipa
+          path: |
+            ${{ github.workspace }}/HikariNovel-${{ env.DISPLAY_VERSION }}-unsigned.ipa
           if-no-files-found: error
           retention-days: 14
